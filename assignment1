@@ -1,0 +1,278 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX_APARTMENTS 100
+#define MAX_ROOMS 100
+#define END_OF_APARTMENT -1
+#define LINE " +-------+----------------+----------------+----------------+"
+#define HEAD " | Apart |    Dry areas   |    Wet areas   |  Utility areas |"
+
+
+struct Rooms {
+  int roomType;
+  int roomNumber;
+  double xsize;
+  double ysize;
+};
+
+struct Apartments {
+  int apartmentNumber;
+  int roomCount;
+  double area;
+  double wet;
+  double dry;
+  double util;
+  struct Rooms room[MAX_ROOMS];
+};
+
+int create_apartments(struct Apartments *apartment);
+int same_room(struct Rooms x, struct Rooms y);
+void add_area_type(struct Apartments x, double area, int roomType);
+void print_room_type(int n);
+void print_room_data(struct Rooms x, double area);
+void print_apartment_summary(struct Apartments *apartment, int apartmentCount);
+void print_area_summary(struct Apartments *apartment, int apartmentCount);
+double find_area(struct Rooms x);
+
+
+int main(void){
+  struct Apartments apartment[MAX_APARTMENTS];
+  int apartmentCount = create_apartments(apartment);
+  print_apartment_summary(apartment, apartmentCount);
+  print_area_summary(apartment, apartmentCount);
+  return 0;
+}
+
+void print_apartment_summary(struct Apartments *apartment, int apartmentCount){
+  int i,j,type;
+  double totalArea, roomArea, sectionArea = 0;
+  for(i=0;i<apartmentCount;i++){
+      printf(" Apartment %d\n --------------\n", apartment[i].apartmentNumber);
+      totalArea=0;
+      for(j=0;j<apartment[i].roomCount;j++){
+        roomArea = find_area(apartment[i].room[j]);
+        totalArea += roomArea;
+        type = apartment[i].room[j].roomType;
+        if(type == 1 || type == 2 || type == 3){
+          apartment[i].dry += roomArea;
+        }
+        else if(type == 4 || type == 5 || type == 6){
+          apartment[i].wet += roomArea;
+        }
+        else{
+          apartment[i].util += roomArea;
+        }
+        add_area_type(apartment[i],roomArea,apartment[i].room[j].roomType);
+        /*printf("%lf %lf %lf",apartment[i].dry,apartment[i].wet, apartment[i].util);*/
+        if (same_room(apartment[i].room[j],apartment[i].room[j+1])){
+          sectionArea += roomArea;
+          print_room_data(apartment[i].room[j],-1);
+        }
+        else{
+          sectionArea += roomArea;
+          print_room_data(apartment[i].room[j],sectionArea);
+          sectionArea = 0;
+        }
+      }
+      apartment[i].area = totalArea;
+      printf("    Total Area               %5.2lf metres^2\n\n",totalArea);
+    }
+}
+
+int create_apartments(struct Apartments *apartment){
+  int i,j, integer;
+
+  for(i=0;i<MAX_APARTMENTS;i++){
+    if(scanf("%d",&integer)==1){
+      apartment[i].apartmentNumber = integer;
+    }
+    else return i;
+
+    for (j=0;j<=MAX_ROOMS;j++){
+      scanf("%d",&integer);
+      if(integer == -1){
+        apartment[i].roomCount = j;
+        break;
+      }
+      apartment[i].room[j].roomType = integer;
+      scanf("%d",&apartment[i].room[j].roomNumber);
+      scanf("%lf",&apartment[i].room[j].xsize);
+      scanf("%lf",&apartment[i].room[j].ysize);
+    }
+  }
+  return i;
+}
+
+int same_room(struct Rooms x, struct Rooms y){
+  if(x.roomType == y.roomType && x.roomNumber == y.roomNumber){
+    return 1;
+  }
+  return 0;
+}
+
+double find_area(struct Rooms x){
+  return x.xsize * x.ysize;
+}
+
+void print_room_type(int n){
+  if (n == 1){
+    printf("    Hallway ");
+  }
+  else if(n == 2){
+    printf("    Bedroom ");
+  }
+  else if(n == 3){
+    printf("    Living  ");
+  }
+  else if(n == 4){
+    printf("    Bathroom");
+  }
+  else if(n == 5){
+    printf("    Kitchen ");
+  }
+  else if(n == 6){
+    printf("    Laundry ");
+  }
+  else if(n == 7){
+    printf("    Storage ");
+  }
+  else if(n == 8){
+    printf("    Garage  ");
+  }
+  else{
+    printf("    Balcony ");
+  }
+}
+
+void print_room_data(struct Rooms x, double area){
+  print_room_type(x.roomType);
+  if (area == -1){
+    printf(" %3d %5.2lf %5.2lf  --- \n",
+            x.roomNumber,
+            x.xsize,
+            x.ysize);
+  }
+  else {
+    printf(" %3d %5.2lf %5.2lf %5.2lf \n",
+            x.roomNumber,
+            x.xsize,
+            x.ysize,
+            area);
+  }
+}
+
+void add_area_type(struct Apartments x, double area, int Type){
+  if(Type == 1 || Type == 2 || Type == 3){
+    x.dry += area;
+  }
+  else if(Type == 4 || Type == 5 || Type == 6){
+    x.wet += area;
+  }
+  else{
+    x.util += area;
+  }
+}
+
+void print_area_summary(struct Apartments *apartment, int apartmentCount){
+  int i;
+  double total, drypercent,  wetpercent, utilpercent;
+  printf(LINE "\n");
+  printf(HEAD "\n");
+  printf(LINE "\n");
+  for(i=0;i<apartmentCount;i++){
+    total = apartment[i].area;
+    drypercent = (apartment[i].dry/total)*100;
+    wetpercent = (apartment[i].wet/total)*100;
+    utilpercent = (apartment[i].util/total)*100;
+    printf(" |  %d  |  %5.2lf %5.1lf%%  ",
+                                          apartment[i].apartmentNumber,
+                                          apartment[i].dry, drypercent);
+    printf("|  %5.2lf %5.1lf%%  | %5.2lf %5.1lf%%   |\n",
+                                          apartment[i].wet, wetpercent,
+                                          apartment[i].util, utilpercent);
+  }
+  printf(LINE "\n");
+}
+
+
+/*void print_apartment_summary(struct Apartments *apartment, int apartmentCount){
+  int i,j;
+  double totalArea, roomArea, currentRoomArea = 0;
+  for(i=0;i<=apartmentCount;i++){
+      printf("\nApartment %d\n\n", apartment[i].apartmentNumber);
+      printf("Room Count: %d\n", apartment[i].roomCount);
+      for(j=0;j<apartment[i].roomCount;j++){
+          roomArea = find_area(apartment[i].room[j]);
+          if(j==apartment[i].roomCount-1){
+            if (same_room(apartment[i].room[j],apartment[i].room[j-1])){
+              currentRoomArea += roomArea;
+              print_room_data(apartment[i].room[j],currentRoomArea);
+              currentRoomArea = 0;
+            }
+            else{
+              print_room_data(apartment[i].room[j],roomArea);
+            }
+          }
+          else{
+              if (same_room(apartment[i].room[j],apartment[i].room[j+1])){
+                currentRoomArea += roomArea;
+                print_room_data(apartment[i].room[j],-1);
+              }
+              else{
+                currentRoomArea += roomArea;
+                print_room_data(apartment[i].room[j],currentRoomArea);
+                currentRoomArea = 0;
+              }
+          }
+        }
+      }
+}
+*/
+
+
+
+
+/*int create_apartments(struct Apartments *apartment){
+  double num;
+  int counter = 0, numberOfRooms = 0, numberOfAparments = 0;
+  while(scanf("%lf",&num) == 1){
+    if (counter == 0)
+    {
+        apartment[numberOfAparments].apartmentNumber = (int) num;
+        apartment[numberOfAparments].roomCount = 0;
+        numberOfRooms = 0;
+        counter++;
+    }
+    else if (counter == 1)
+    {
+      if (num == END_OF_APARTMENT)
+      {
+        counter = 0;
+        apartment[numberOfAparments].roomCount = numberOfRooms;
+        numberOfAparments++;
+      }
+      else
+      {
+        apartment[numberOfAparments].room[numberOfRooms].roomType = (int) num;
+        counter++;
+      }
+    }
+    else if (counter == 2)
+    {
+      apartment[numberOfAparments].room[numberOfRooms].roomNumber = (int) num;
+      counter++;
+    }
+    else if (counter == 3)
+    {
+      apartment[numberOfAparments].room[numberOfRooms].xsize = num;
+      counter++;
+    }
+    else if (counter == 4)
+    {
+      apartment[numberOfAparments].room[numberOfRooms].ysize = num;
+      counter = 1;
+      numberOfRooms++;
+    }
+  }
+  return numberOfAparments-1;
+}*/
