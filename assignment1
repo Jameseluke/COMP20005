@@ -1,13 +1,20 @@
+/* 
+   Solution to COMP20005 Assignment 1, April 2016.
+   James Luke, JLuke1@student.unimelb.edu.au
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX_APARTMENTS 100
-#define MAX_ROOMS 100
-#define END_OF_APARTMENT -1
+#define MAX_APARTMENTS 100    /* max apartments from specification */
+#define MAX_ROOMS 100         /* max rooms from specification */
+#define END_OF_APARTMENT -1   /* signals the end of apartment data */
+                             
+                              /* formatting for stage 4 table */
 #define LINE " +-------+----------------+----------------+----------------+"
 #define HEAD " | Apart |    Dry areas   |    Wet areas   |  Utility areas |"
 
-
+/* holds the information for each individual room in an apartment */
 struct Rooms {
   int roomType;
   int roomNumber;
@@ -15,6 +22,7 @@ struct Rooms {
   double ysize;
 };
 
+/* contains an array of rooms and information for individual apartments */
 struct Apartments {
   int apartmentNumber;
   int roomCount;
@@ -25,8 +33,9 @@ struct Apartments {
   struct Rooms room[MAX_ROOMS];
 };
 
+/* function prototypes */
 int create_apartments(struct Apartments *apartment);
-int same_room(struct Rooms x, struct Rooms y);
+int same_section(struct Rooms x, struct Rooms y);
 void print_room_type(int n);
 void print_room_data(struct Rooms x, double area);
 void print_apartment_summary(struct Apartments *apartment, int apartmentCount);
@@ -35,23 +44,34 @@ double find_area(struct Rooms x);
 
 
 int main(void){
+  /* creates an array of apartments that can be iterated over by functions */ 
   struct Apartments apartment[MAX_APARTMENTS];
   int apartmentCount = create_apartments(apartment);
+  /* Stage 3 Output */
   print_apartment_summary(apartment, apartmentCount);
+  /* Stage 4 Output */
   print_area_summary(apartment, apartmentCount);
   return 0;
 }
 
+/* Prints out the stage 3 data in correct format
+   Takes an array of apartments and the amount of apartments in the array
+*/
 void print_apartment_summary(struct Apartments *apartment, int apartmentCount){
   int i,j,type;
-  double totalArea, roomArea, sectionArea = 0;
+   /* section is a group of rooms with same type and number */
+  double apartmentArea, roomArea, sectionArea = 0;  
+  /* loops through each apartment */
   for(i=0;i<apartmentCount;i++){
       printf(" Apartment %d\n --------------\n", apartment[i].apartmentNumber);
-      totalArea=0;
+      /* reset apartment area for each new apartment
+      apartmentArea=0;
+      /* loops through each room in current apartment */
       for(j=0;j<apartment[i].roomCount;j++){
         roomArea = find_area(apartment[i].room[j]);
-        totalArea += roomArea;
+        apartmentArea += roomArea;
         type = apartment[i].room[j].roomType;
+        /* add area of current room to supertype based on type code */
         if(type == 1 || type == 2 || type == 3){
           apartment[i].dry += roomArea;
         }
@@ -61,57 +81,79 @@ void print_apartment_summary(struct Apartments *apartment, int apartmentCount){
         else{
           apartment[i].util += roomArea;
         }
-        /*printf("%lf %lf %lf",apartment[i].dry,apartment[i].wet, apartment[i].util);*/
-        if (same_room(apartment[i].room[j],apartment[i].room[j+1])){
+        if (same_section(apartment[i].room[j],apartment[i].room[j+1])){
           sectionArea += roomArea;
+          /* next room is in the same section, so no area data printed */
           print_room_data(apartment[i].room[j],-1);
         }
         else{
           sectionArea += roomArea;
+          /* next room is in different section, so section area printed */
           print_room_data(apartment[i].room[j],sectionArea);
+          /* reset section area, as next room is in new section */
           sectionArea = 0;
         }
       }
-      apartment[i].area = totalArea;
+      apartment[i].area = apartmentArea;
       printf("    Total Area               %5.2lf metres^2\n\n",totalArea);
     }
 }
 
+/* Reads in the data from stdin and saves it in the array of apartments
+   Takes an array of apartments
+   Returns the amount of apartments created
+*/
 int create_apartments(struct Apartments *apartment){
   int i,j, integer;
 
   for(i=0;i<MAX_APARTMENTS;i++){
+    /* first number read will be apartment number or EOF */
     if(scanf("%d",&integer)==1){
       apartment[i].apartmentNumber = integer;
     }
+    /* return the number of apartments once all apartments created */
     else return i;
-
+    
     for (j=0;j<=MAX_ROOMS;j++){
+      /* first number read in row will be an area or -1
       scanf("%d",&integer);
-      if(integer == -1){
+      if(integer == END_OF_APARTMENT){
         apartment[i].roomCount = j;
+        /* break returns program to apartment loop, starting next apartment */
         break;
       }
+      /* if first number isnt -1, the row contains room data */
       apartment[i].room[j].roomType = integer;
       scanf("%d",&apartment[i].room[j].roomNumber);
       scanf("%lf",&apartment[i].room[j].xsize);
       scanf("%lf",&apartment[i].room[j].ysize);
     }
   }
-  return i;
+  return MAX_APARTMENTS;
 }
 
-int same_room(struct Rooms x, struct Rooms y){
+/* Checks if two rooms are in the same section
+   Takes two rooms
+   Returns 1 if in same section, 0 if not
+*/
+int same_section(struct Rooms x, struct Rooms y){
   if(x.roomType == y.roomType && x.roomNumber == y.roomNumber){
     return 1;
   }
   return 0;
 }
 
+/* Calculates the area of a given room
+   Takes room
+   Returns area of room
+*/
 double find_area(struct Rooms x){
   return x.xsize * x.ysize;
 }
 
+/* Prints out the type string based on type code
+   Takes type
+*/
 void print_room_type(int n){
   if (n == 1){
     printf("    Hallway ");
@@ -142,8 +184,12 @@ void print_room_type(int n){
   }
 }
 
+/* Prints the data of a single room
+   Takes room and area
+*/
 void print_room_data(struct Rooms x, double area){
   print_room_type(x.roomType);
+  /* if supplied with an area of -1, doesnt print area */
   if (area == -1){
     printf(" %3d %5.2lf %5.2lf  --- \n",
             x.roomNumber,
@@ -159,7 +205,9 @@ void print_room_data(struct Rooms x, double area){
   }
 }
 
-
+/* Prints out Stage 4 summary table
+   Takes array of apartments and number of apartments created
+*/
 void print_area_summary(struct Apartments *apartment, int apartmentCount){
   int i;
   double total, drypercent,  wetpercent, utilpercent;
