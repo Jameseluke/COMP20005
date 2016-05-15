@@ -1,0 +1,397 @@
+/*
+   Solution to COMP20005 Assignment 2, May 2016.
+   James Luke, JLuke1@student.unimelb.edu.au
+
+   Uses a Breadth-First-Search technique to assign a path distance to all
+   path squares in a maze, thus finding the shortest path through a maze read
+   in from stdin
+*/
+
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX_COLUMNS 100        /* maximum columns in maze from specification */
+#define MAX_ROWS 100           /* maximum columns in maze from specification */
+#define MAX_QUEUE_LENGTH 200   /*  maximum length of queue */
+#define WALL 0                 /* type code for wall squares */
+#define PATH 1                 /* type code for path squares */
+#define TRUE 1
+#define FALSE 0
+
+
+typedef struct Square {
+
+  int type;     /* contains either WALL or PATH */
+  int level;    /* contains the distance of square from entrance */
+  int parentX;  /* contains the x cooridnate of the square before in path */
+  int parentY;  /* contains the y cooridnate of the square before in path */
+  int bestPath; /* contains TRUE if square is on best path, else FALSE */
+
+} Square;
+
+typedef struct Maze {
+  Square squares[MAX_ROWS][MAX_COLUMNS];  /* 2d array of maze squares */
+  int numRows;
+  int numColumns;
+  int hasSolution;
+  int solutionX;            /* X coordinate of exit with lowest level */
+} Maze;
+
+  /* defines a circular queue to be used for level mapping */
+typedef struct Abstract_Queue {
+  /* each squares coordinate are queued Y then X */
+  int realQueue[MAX_QUEUE_LENGTH];
+  int counter;  /* contains the number of elements currently in queue */
+  int start;    /* contains the index of the front of the queue*/
+} Abstract_Queue;
+
+
+/* function prototypes */
+void read_maze(Maze *maze);
+void map_levels(Maze *maze, Abstract_Queue *q);
+void enqueue(Abstract_Queue *q, int val);
+int dequeue(Abstract_Queue *q);
+void check_direction( int y, int x, int dy, int dx, Maze *maze, Abstract_Queue *q);
+void find_entrances(Maze *maze, Abstract_Queue *q);
+void find_best_path(Maze *maze, int y, int x);
+void find_best_exit(Maze *maze);
+void print_stage_1(Maze *maze);
+void print_stage_2(Maze *maze);
+void print_stage_3(Maze *maze);
+void print_stage_4(Maze *maze);
+
+
+
+int main(void){
+  Maze currentMaze;
+  Abstract_Queue q;
+  /* create an array of squares based on input file */
+  read_maze(&currentMaze);
+  /* pass through array and give each square a level */
+  map_levels(&currentMaze, &q);
+  /* find the left-most exit with the lowest path length */
+  find_best_exit(&currentMaze);
+  /* Stage 1 Output */
+  print_stage_1(&currentMaze);
+  /* Stage 2 Output */
+  print_stage_2(&currentMaze);
+  print_stage_3(&currentMaze);
+  /* conditional Stage 4 Output */
+  if (currentMaze.hasSolution){
+    /* recurse through rooms from best exit to find best path */
+    find_best_path(&currentMaze, currentMaze.numRows-1,currentMaze.solutionX);
+    print_stage_4(&currentMaze);
+  }
+  return 0;
+}
+
+
+/* reads in the data from stdin and saves it in a 2d array of squares
+   takes a pointer to a maze
+*/
+
+void read_maze(Maze *maze){
+  int column = 0, row = 0;
+  char next;
+
+  while(row < MAX_ROWS){
+    next = getchar();
+    if (next==EOF){
+      /* Finish reading in maze on EOF */
+      break;
+    }
+    else if(column >= MAX_COLUMNS){
+      /* Error has occured */
+      printf("ERROR: Max columns exceeded");
+      exit(EXIT_FAILURE);
+    }
+
+    if (next == '\n'){
+      /* If newline is read, start new column of maze */
+      maze->numColumns = column;
+      column = 0;
+      row += 1;
+      }
+      /* Assign correct type to all squares and an initial level of -1 */
+    else if(next == '#'){
+      maze->squares[row][column].type = WALL;
+      maze->squares[row][column].level = -1;
+      column += 1;
+    }
+    else if (next == '.'){
+      maze->squares[row][column].type = PATH;
+      maze->squares[row][column].level = -1;
+      /*  Paths are not on best path by default */
+      maze->squares[row][column].bestPath = FALSE;
+      column += 1;
+    }
+    else {
+      /* do nothing */
+    }
+  }
+  maze->numRows = row;
+}
+
+
+/* prints out the stage 1 output in correct format
+   takes a pointer to a maze
+*/
+void print_stage_1(Maze *maze){
+  int i,j;
+  printf(" Stage 1\n =========\n");
+  printf(" Maze has %d rows and %d columns\n ",maze->numRows,maze->numColumns);
+  for(i = 0;i< maze->numRows; i++){
+    for (j = 0; j< maze->numColumns; j++){
+      if (maze->squares[i][j].type == PATH){
+        printf("..");
+      }
+      else {
+        printf("##");
+      }
+    }
+    printf("\n ");
+  }
+  printf("\n");
+}
+
+
+/* prints out the stage 2 output in correct format
+   takes a pointer to a maze
+*/
+
+void print_stage_2(Maze *maze){
+  int i,j;
+  printf(" Stage 2\n =========\n ");
+  if(maze->hasSolution){
+    printf("maze has solution\n ");
+  }
+  else{
+    printf("maze does not have a solution\n ");
+  }
+
+  for(i = 0;i< maze->numRows; i++){
+    for (j = 0; j< maze->numColumns; j++){
+      if (maze->squares[i][j].type == WALL){
+          printf("##");
+        }
+      else if (maze->squares[i][j].level > -1){
+          printf("++");
+      }
+      else {
+        /* If a path was not reached by the leveling system, it is unreachable,
+        thus print out -- */
+        printf("--");
+      }
+    }
+    printf("\n ");
+  }
+  printf("\n");
+}
+
+
+/* prints out the stage 3 output in correct format
+   takes a pointer to a maze
+*/
+
+void print_stage_3(Maze *maze){
+  int i,j,pathLength;
+  printf(" Stage 3\n =========\n ");
+  if(maze->hasSolution){
+    /* the level of the last square in the path is equal to the
+    total path length */
+    pathLength = maze->squares[maze->numRows-1][maze->solutionX].level;
+    printf("maze has solution with cost %d\n ",pathLength);
+  }
+  else{
+    printf("maze does not have a solution\n ");
+  }
+
+  for(i = 0;i< maze->numRows; i++){
+    for (j = 0; j< maze->numColumns; j++){
+      if (maze->squares[i][j].type == WALL){
+          printf("##");
+        }
+      else if (maze->squares[i][j].level == -1){
+          printf("--");
+      }
+      /* modulus 2 ensures only every second path's length is printed*/
+      else if(maze->squares[i][j].level % 2 == 0){
+        /* modulus 100 ensures only the last two digits of the path are shown */
+        printf("%02d",maze->squares[i][j].level%100);
+      }
+      else{
+        printf("++");
+      }
+    }
+    printf("\n ");
+  }
+  printf("\n");
+
+}
+
+
+/* prints out the stage 4 output in correct format
+   takes a pointer to a maze
+*/
+
+void print_stage_4(Maze *maze){
+  int i,j;
+  printf(" Stage 4\n =========\n maze solution\n ");
+  for(i = 0;i< maze->numRows; i++){
+    for (j = 0; j< maze->numColumns; j++){
+      if (maze->squares[i][j].type == WALL){
+          printf("##");
+        }
+      else if (maze->squares[i][j].bestPath == TRUE){
+        /* modulus 2 ensures only every second path's length is printed*/
+        if(maze->squares[i][j].level % 2 == 0){
+          /* modulus 100 ensures only the last two digits of the path are shown */
+          printf("%02d",maze->squares[i][j].level);
+        }
+        else{
+          printf("..");
+        }
+      }
+      else if (maze->squares[i][j].level == -1){
+        printf("--");
+      }
+      else {
+        printf("  ");
+      }
+    }
+    printf("\n ");
+  }
+  printf("\n");
+}
+
+
+/* assigns each path square a level
+   takes a pointer to a maze and a queue
+*/
+
+void map_levels(Maze *maze, Abstract_Queue *q){
+  /* find the x,y coordinates of all entries to the maze and enqueue */
+  find_entrances(maze,q);
+  int x,y;
+  /* Takes a point from the queue, and enqueues all of its children that have
+     not been assigned a level yet, or have a higher level than the current
+     level plus one */
+  while(q->counter > 0){  /* repeats until the queue is empty */
+    y = dequeue(q);
+    x = dequeue(q);
+    check_direction(y,x,-1,0,maze,q); /* up */
+    check_direction(y,x,0,1,maze,q);  /* right */
+    check_direction(y,x,1,0,maze,q);  /* down */
+    check_direction(y,x,0,-1,maze,q); /* left */
+  }
+}
+
+
+/* finds all path squares in first row, and appends each to queue
+   takes a pointer to a maze and a queue
+*/
+
+void find_entrances(Maze *maze, Abstract_Queue *q){
+  int i;
+  for(i=0; i < maze->numColumns; i++){
+    if(maze->squares[0][i].type == PATH){
+      maze->squares[0][i].level = 0;
+      enqueue(q, 0); /* Entries are always on first row */
+      enqueue(q,i);
+    }
+  }
+}
+
+/* checks a square in a given direction to see if it can be assigned a level
+   if it can, sets its parent coordinates, its level, and enqueues the square
+   takes a pointer to a maze and a queue
+*/
+
+void check_direction( int y, int x, int dy, int dx, Maze *maze, Abstract_Queue *q){
+  if ((y == 0 && dy == -1) || (x == 0 && dx == -1)){
+    /* do nothing as direction is outside maze upwards or to the left */
+  }
+  else if (y == (maze->numRows) && dy == + 1){
+    /* do nothing as direction is outside maze downwards*/
+  }
+  else if (x == (maze->numColumns) && dx == + 1){
+    /* do nothing as direction is outside maze to the right */
+  }
+  else if (maze->squares[y+dy][x+dx].type == WALL){
+    /* do nothing as direction is a wall */
+     }
+  else {
+    if (maze->squares[y+dy][x+dx].level > maze->squares[y][x].level + 1
+        || maze->squares[y+dy][x+dx].level == -1){
+            /* sets level for all squares that have not been assigned a level
+            yet, or have a higher level than the current level plus one */
+            maze->squares[y+dy][x+dx].level = maze->squares[y][x].level + 1;
+            /* set parent square to easily find best path */
+            maze->squares[y+dy][x+dx].parentY = y;
+            maze->squares[y+dy][x+dx].parentX = x;
+            enqueue(q, y+dy);
+            enqueue(q, x+dx);
+    }
+  }
+}
+
+/* iterates over squares in last row to find square with smallest level
+   takes a pointer to a maze
+*/
+void find_best_exit(Maze *maze){
+  maze->hasSolution = FALSE;
+  int firstFound = FALSE, k;
+  int lowest;
+  for(k=0;k < maze->numColumns; k++){
+    if(maze->squares[maze->numRows-1][k].type==PATH &&
+      maze->squares[maze->numRows-1][k].level > -1){
+
+      if (!firstFound){
+        firstFound = TRUE;
+        maze->solutionX = k;
+        lowest = maze->squares[maze->numRows-1][k].level;
+        maze->hasSolution = TRUE;
+      }
+      else if(maze->squares[maze->numRows-1][k].level < lowest){
+        maze->solutionX = k;
+      }
+    }
+  }
+}
+
+void find_best_path(Maze *maze, int y, int x){
+  int parentX, parentY;
+  if (y == 0){
+    maze->squares[y][x].bestPath = TRUE;
+  }
+  else{
+    maze->squares[y][x].bestPath = TRUE;
+    parentX = maze->squares[y][x].parentX;
+    parentY = maze->squares[y][x].parentY;
+    find_best_path(maze, parentY, parentX);
+  }
+}
+
+
+
+void enqueue(Abstract_Queue *q, int val){
+  int index = (q->start + q->counter) % MAX_QUEUE_LENGTH;
+  if (index == q->start && q->counter > 0){
+    printf("ERROR: Queue Maxed. Increase Queue Size and Re-compile");
+    exit(EXIT_FAILURE);
+  }
+  else {
+    q->realQueue[index] = val;
+    q->counter += 1;
+    }
+}
+
+int dequeue(Abstract_Queue *q){
+  int index = (q->start)%MAX_QUEUE_LENGTH;
+  q->start += 1;
+  q->counter -= 1;
+  return q->realQueue[index];
+}
