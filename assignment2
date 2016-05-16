@@ -129,7 +129,9 @@ void read_maze(Maze *maze){
       column += 1;
     }
     else {
-      /* do nothing */
+      /* input contains a non-expected character */
+      printf("ERROR: Incorrect input, please check and re-run");
+      exit(EXIT_FAILURE);
     }
   }
   maze->numRows = row;
@@ -348,11 +350,14 @@ void find_best_exit(Maze *maze){
   for(k=0;k < maze->numColumns; k++){
     if(maze->squares[maze->numRows-1][k].type==PATH &&
       maze->squares[maze->numRows-1][k].level > -1){
-
+      /* stops comparison of squares level and non-defined variable lowest */
       if (!firstFound){
         firstFound = TRUE;
+        /* y coordinate of solution is always last row so only x is stored */
         maze->solutionX = k;
+        /* set current lowest path length to be compared against */
         lowest = maze->squares[maze->numRows-1][k].level;
+        /* maze has solution as long as one exit has been given a level */
         maze->hasSolution = TRUE;
       }
       else if(maze->squares[maze->numRows-1][k].level < lowest){
@@ -362,23 +367,34 @@ void find_best_exit(Maze *maze){
   }
 }
 
+/* takes a given starting point and recurses up the maze from child to parent
+   sets the best path variable of all squares recursed through to true
+   takes a pointer to a maze, a y coordinate and an x coordinate
+*/
+
 void find_best_path(Maze *maze, int y, int x){
   int parentX, parentY;
   if (y == 0){
+    /* stop recursion when path reaches first row */
     maze->squares[y][x].bestPath = TRUE;
   }
   else{
     maze->squares[y][x].bestPath = TRUE;
     parentX = maze->squares[y][x].parentX;
     parentY = maze->squares[y][x].parentY;
+    /* call best path on parent of initial square */
     find_best_path(maze, parentY, parentX);
   }
 }
 
 
-
+/* adds an integer to the end of a given queue, updates counter and start
+   takes a pointer to queue, and an int to be appended
+*/
 void enqueue(Abstract_Queue *q, int val){
+  /* modulus queue length makes queue circular - can reuse indexes */
   int index = (q->start + q->counter) % MAX_QUEUE_LENGTH;
+  /* index should only be the same as start when the queue is empty */
   if (index == q->start && q->counter > 0){
     printf("ERROR: Queue Maxed. Increase Queue Size and Re-compile");
     exit(EXIT_FAILURE);
@@ -389,9 +405,16 @@ void enqueue(Abstract_Queue *q, int val){
     }
 }
 
+/* removes an integer from the start of a  queue, updates counter and start
+   takes a pointer to queue
+   returns the integer removed
+*/
+
 int dequeue(Abstract_Queue *q){
   int index = (q->start)%MAX_QUEUE_LENGTH;
   q->start += 1;
   q->counter -= 1;
   return q->realQueue[index];
 }
+
+// Programming is fun
